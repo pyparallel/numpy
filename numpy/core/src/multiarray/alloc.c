@@ -19,8 +19,25 @@ typedef struct {
     npy_uintp available; /* number of cached pointers */
     void * ptrs[NCACHE];
 } cache_bucket;
-static cache_bucket datacache[NBUCKETS];
-static cache_bucket dimcache[NBUCKETS_DIM];
+
+Py_CACHE_ALIGN
+Py_TLS static cache_bucket datacache[NBUCKETS];
+
+Py_CACHE_ALIGN
+Py_TLS static cache_bucket dimcache[NBUCKETS_DIM];
+
+#define malloc  PyMem_RawMalloc
+#define calloc  PyMem_RawCalloc
+#define realloc PyMem_RawRealloc
+#define free    PyMem_RawFree
+
+/*
+#define _alignment      16
+#define malloc(n)       PyMem_RawAlignedMalloc(n, _alignment)
+#define calloc(n, e)    PyMem_RawAlignedCalloc(n, e, _alignment)
+#define realloc(p, n)   PyMem_RawAlignedRealloc(p, n, _alignment)
+#define free            PyMem_RawFree
+*/
 
 /*
  * very simplistic small memory block cache to avoid more expensive libc
@@ -151,6 +168,7 @@ PyDataMem_SetEventHook(PyDataMem_EventHookFunc *newhook,
 {
     PyDataMem_EventHookFunc *temp;
     NPY_ALLOW_C_API_DEF
+    Px_RETURN_NULL();
     NPY_ALLOW_C_API
     temp = _PyDataMem_eventhook;
     _PyDataMem_eventhook = newhook;
@@ -171,6 +189,7 @@ PyDataMem_NEW(size_t size)
     void *result;
 
     result = malloc(size);
+    Px_RETURN(result);
     if (_PyDataMem_eventhook != NULL) {
         NPY_ALLOW_C_API_DEF
         NPY_ALLOW_C_API
@@ -192,6 +211,7 @@ PyDataMem_NEW_ZEROED(size_t size, size_t elsize)
     void *result;
 
     result = calloc(size, elsize);
+    Px_RETURN(result);
     if (_PyDataMem_eventhook != NULL) {
         NPY_ALLOW_C_API_DEF
         NPY_ALLOW_C_API
@@ -211,6 +231,7 @@ NPY_NO_EXPORT void
 PyDataMem_FREE(void *ptr)
 {
     free(ptr);
+    Px_VOID();
     if (_PyDataMem_eventhook != NULL) {
         NPY_ALLOW_C_API_DEF
         NPY_ALLOW_C_API
@@ -231,6 +252,7 @@ PyDataMem_RENEW(void *ptr, size_t size)
     void *result;
 
     result = realloc(ptr, size);
+    Px_RETURN(result);
     if (_PyDataMem_eventhook != NULL) {
         NPY_ALLOW_C_API_DEF
         NPY_ALLOW_C_API
