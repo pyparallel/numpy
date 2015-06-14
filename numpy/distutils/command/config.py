@@ -84,6 +84,10 @@ Original exception was: %s, and the Compiler class was %s
                                 self.compiler.ldflags_shared_debug]:
                     if '/MANIFEST' not in ldflags:
                         ldflags.append('/MANIFEST')
+                    if '/DEBUG' not in ldflags:
+                        ldflags.append('/DEBUG')
+                    if '/pdb:None' in ldflags:
+                        ldflags.remove('/pdb:None')
 
         if not isinstance(self.fcompiler, FCompiler):
             self.fcompiler = new_fcompiler(compiler=self.fcompiler,
