@@ -35,6 +35,9 @@ abs_intp(npy_intp x)
     return abs(x);
 #elif (NPY_SIZEOF_INTP <= NPY_SIZEOF_LONG)
     return labs(x);
+#elif defined(_MSC_VER) && (_MSC_VER < 1600)
+    /* llabs is not available with Visual Studio 2008 */
+    return x > 0 ? x : -x;
 #else
     return llabs(x);
 #endif
@@ -536,12 +539,13 @@ sse2_compress4_to_byte_@TYPE@(@vtype@ r1, @vtype@ r2, @vtype@ r3, @vtype@ * r4,
 static NPY_INLINE int
 sse2_ordered_cmp_@kind@_@TYPE@(const @type@ a, const @type@ b)
 {
+    @vtype@ one = @vpre@_set1_@vsuf@(1);
     @type@ tmp;
     @vtype@ v = @vpre@_@VOP@_@vsufs@(@vpre@_load_@vsufs@(&a),
                                      @vpre@_load_@vsufs@(&b));
+    v = @vpre@_and_@vsuf@(v, one);
     @vpre@_store_@vsufs@(&tmp, v);
-    return sizeof(@type@) == 4 ?
-        (*(npy_uint32 *)&tmp) & 1 : (*(npy_uint64 *)&tmp) & 1;
+    return tmp;
 }
 
 static void

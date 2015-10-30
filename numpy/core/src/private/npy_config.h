@@ -32,7 +32,7 @@
 #endif
 
 /* Disable broken MS math functions */
-#if defined(_MSC_VER) || defined(__MINGW32_VERSION)
+#if (defined(_MSC_VER) && (_MSC_VER < 1900)) || defined(__MINGW32_VERSION)
 
 #undef HAVE_ATAN2
 #undef HAVE_ATAN2F
@@ -43,6 +43,32 @@
 #undef HAVE_HYPOTL
 
 #endif
+
+#if defined(_MSC_VER) && (_MSC_VER == 1900)
+
+#undef HAVE_CASIN
+#undef HAVE_CASINF
+#undef HAVE_CASINL
+#undef HAVE_CASINH
+#undef HAVE_CASINHF
+#undef HAVE_CASINHL
+#undef HAVE_CATAN
+#undef HAVE_CATANF
+#undef HAVE_CATANL
+#undef HAVE_CATANH
+#undef HAVE_CATANHF
+#undef HAVE_CATANHL
+
+#endif
+
+
+/* Intel C for Windows uses POW for 64 bits longdouble*/
+#if defined(_MSC_VER) && defined(__INTEL_COMPILER)
+#if defined(HAVE_POWL) && (NPY_SIZEOF_LONGDOUBLE == 8)
+#undef HAVE_POWL
+#endif
+#endif /* defined(_MSC_VER) && defined(__INTEL_COMPILER) */
+
 
 /* Disable broken gnu trig functions on linux */
 #if defined(__linux__) && defined(__GNUC__)

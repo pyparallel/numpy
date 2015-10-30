@@ -37,52 +37,6 @@ __all__ = [
     ]
 
 
-def seek_gzip_factory(f):
-    """Use this factory to produce the class so that we can do a lazy
-    import on gzip.
-
-    """
-    import gzip
-
-    class GzipFile(gzip.GzipFile):
-
-        def seek(self, offset, whence=0):
-            # figure out new position (we can only seek forwards)
-            if whence == 1:
-                offset = self.offset + offset
-
-            if whence not in [0, 1]:
-                raise IOError("Illegal argument")
-
-            if offset < self.offset:
-                # for negative seek, rewind and do positive seek
-                self.rewind()
-                count = offset - self.offset
-                for i in range(count // 1024):
-                    self.read(1024)
-                self.read(count % 1024)
-
-        def tell(self):
-            return self.offset
-
-    if isinstance(f, str):
-        f = GzipFile(f)
-    elif isinstance(f, gzip.GzipFile):
-        # cast to our GzipFile if its already a gzip.GzipFile
-
-        try:
-            name = f.name
-        except AttributeError:
-            # Backward compatibility for <= 2.5
-            name = f.filename
-        mode = f.mode
-
-        f = GzipFile(fileobj=f.fileobj, filename=name)
-        f.mode = mode
-
-    return f
-
-
 class BagObj(object):
     """
     BagObj(obj)
@@ -407,8 +361,6 @@ def load(file, mmap_mode=None, allow_pickle=True, fix_imports=True,
     if isinstance(file, basestring):
         fid = open(file, "rb")
         own_fid = True
-    elif isinstance(file, gzip.GzipFile):
-        fid = seek_gzip_factory(file)
     else:
         fid = file
 
@@ -715,6 +667,8 @@ def _getconv(dtype):
         return np.int64
     if issubclass(typ, np.integer):
         return lambda x: int(float(x))
+    elif issubclass(typ, np.longdouble):
+        return np.longdouble
     elif issubclass(typ, np.floating):
         return floatconv
     elif issubclass(typ, np.complex):
@@ -793,12 +747,13 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
     lines with missing values.
 
     .. versionadded:: 1.10.0
+
     The strings produced by the Python float.hex method can be used as
     input for floats.
 
     Examples
     --------
-    >>> from StringIO import StringIO   # StringIO behaves like a file object
+    >>> from io import StringIO   # StringIO behaves like a file object
     >>> c = StringIO("0 1\\n2 3")
     >>> np.loadtxt(c)
     array([[ 0.,  1.],
@@ -839,7 +794,8 @@ def loadtxt(fname, dtype=float, comments='#', delimiter=None,
         if _is_string_like(fname):
             fown = True
             if fname.endswith('.gz'):
-                fh = iter(seek_gzip_factory(fname))
+                import gzip
+                fh = iter(gzip.GzipFile(fname))
             elif fname.endswith('.bz2'):
                 import bz2
                 fh = iter(bz2.BZ2File(fname))
@@ -1301,13 +1257,12 @@ def fromregex(file, regexp, dtype):
 
 
 def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
-               skiprows=0, skip_header=0, skip_footer=0, converters=None,
-               missing='', missing_values=None, filling_values=None,
-               usecols=None, names=None,
-               excludelist=None, deletechars=None, replace_space='_',
-               autostrip=False, case_sensitive=True, defaultfmt="f%i",
-               unpack=None, usemask=False, loose=True, invalid_raise=True,
-               max_rows=None):
+               skip_header=0, skip_footer=0, converters=None,
+               missing_values=None, filling_values=None, usecols=None,
+               names=None, excludelist=None, deletechars=None,
+               replace_space='_', autostrip=False, case_sensitive=True,
+               defaultfmt="f%i", unpack=None, usemask=False, loose=True,
+               invalid_raise=True, max_rows=None):
     """
     Load data from a text file, with missing values handled as specified.
 
@@ -1316,10 +1271,11 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
 
     Parameters
     ----------
-    fname : file or str
-        File, filename, or generator to read.  If the filename extension is
-        `.gz` or `.bz2`, the file is first decompressed. Note that
-        generators must return byte strings in Python 3k.
+    fname : file, str, list of str, generator
+        File, filename, list, or generator to read.  If the filename
+        extension is `.gz` or `.bz2`, the file is first decompressed. Mote
+        that generators must return byte strings in Python 3k.  The strings
+        in a list or produced by a generator are treated as lines.
     dtype : dtype, optional
         Data type of the resulting array.
         If None, the dtypes will be determined by the contents of each
@@ -1332,8 +1288,7 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
         whitespaces act as delimiter.  An integer or sequence of integers
         can also be provided as width(s) of each field.
     skiprows : int, optional
-        `skiprows` was deprecated in numpy 1.5, and will be removed in
-        numpy 2.0. Please use `skip_header` instead.
+        `skiprows` was removed in numpy 1.10. Please use `skip_header` instead.
     skip_header : int, optional
         The number of lines to skip at the beginning of the file.
     skip_footer : int, optional
@@ -1343,8 +1298,8 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
         The converters can also be used to provide a default value
         for missing data: ``converters = {3: lambda s: float(s or 0)}``.
     missing : variable, optional
-        `missing` was deprecated in numpy 1.5, and will be removed in
-        numpy 2.0. Please use `missing_values` instead.
+        `missing` was removed in numpy 1.10. Please use `missing_values`
+        instead.
     missing_values : variable, optional
         The set of strings corresponding to missing data.
     filling_values : variable, optional
@@ -1422,7 +1377,7 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
 
     Examples
     ---------
-    >>> from StringIO import StringIO
+    >>> from io import StringIO
     >>> import numpy as np
 
     Comma delimited file with mixed dtype
@@ -1475,8 +1430,6 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
         comments = asbytes(comments)
     if isinstance(delimiter, unicode):
         delimiter = asbytes(delimiter)
-    if isinstance(missing, unicode):
-        missing = asbytes(missing)
     if isinstance(missing_values, (unicode, list, tuple)):
         missing_values = asbytes_nested(missing_values)
 
@@ -1503,8 +1456,8 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
             fhd = iter(fname)
     except TypeError:
         raise TypeError(
-            "fname must be a string, filehandle, or generator. "
-            "(got %s instead)" % type(fname))
+            "fname must be a string, filehandle, list of strings, "
+            "or generator. Got %s instead." % type(fname))
 
     split_line = LineSplitter(delimiter=delimiter, comments=comments,
                               autostrip=autostrip)._handyman
@@ -1513,13 +1466,6 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
                                    case_sensitive=case_sensitive,
                                    replace_space=replace_space)
 
-    # Get the first valid lines after the first skiprows ones ..
-    if skiprows:
-        warnings.warn(
-            "The use of `skiprows` is deprecated, it will be removed in "
-            "numpy 2.0.\nPlease use `skip_header` instead.",
-            DeprecationWarning)
-        skip_header = skiprows
     # Skip the first `skip_header` rows
     for i in range(skip_header):
         next(fhd)
@@ -1647,16 +1593,6 @@ def genfromtxt(fname, dtype=float, comments='#', delimiter=None,
     else:
         for entry in missing_values:
             entry.extend([str(user_missing_values)])
-
-    # Process the deprecated `missing`
-    if missing != asbytes(''):
-        warnings.warn(
-            "The use of `missing` is deprecated, it will be removed in "
-            "Numpy 2.0.\nPlease use `missing_values` instead.",
-            DeprecationWarning)
-        values = [str(_) for _ in missing.split(asbytes(","))]
-        for entry in missing_values:
-            entry.extend(values)
 
     # Process the filling_values ...............................
     # Rename the input for convenience

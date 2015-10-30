@@ -6,11 +6,7 @@
 #include "npy_cpu.h"
 #include "utils.h"
 
-#ifdef NPY_ENABLE_SEPARATE_COMPILATION
-        #define NPY_NO_EXPORT NPY_VISIBILITY_HIDDEN
-#else
-        #define NPY_NO_EXPORT static
-#endif
+#define NPY_NO_EXPORT NPY_VISIBILITY_HIDDEN
 
 /* Only use thread if configured in config and python supports it */
 #if defined WITH_THREAD && !NPY_NO_SMP
@@ -156,7 +152,7 @@ typedef enum {
 
 
 typedef enum {
-        NPY_INTROSELECT=0,
+        NPY_INTROSELECT=0
 } NPY_SELECTKIND;
 #define NPY_NSELECTS (NPY_INTROSELECT + 1)
 
@@ -202,7 +198,7 @@ typedef enum {
         /* Allow safe casts or casts within the same kind */
         NPY_SAME_KIND_CASTING=3,
         /* Allow any casts */
-        NPY_UNSAFE_CASTING=4,
+        NPY_UNSAFE_CASTING=4
 } NPY_CASTING;
 
 typedef enum {

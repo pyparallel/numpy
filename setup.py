@@ -15,7 +15,7 @@ basic linear algebra and random number generation.
 """
 from __future__ import division, print_function
 
-DOCLINES = __doc__.split("\n")
+DOCLINES = (__doc__ or '').split("\n")
 
 import os
 import sys
@@ -38,7 +38,15 @@ Intended Audience :: Developers
 License :: OSI Approved
 Programming Language :: C
 Programming Language :: Python
+Programming Language :: Python :: 2
+Programming Language :: Python :: 2.6
+Programming Language :: Python :: 2.7
 Programming Language :: Python :: 3
+Programming Language :: Python :: 3.2
+Programming Language :: Python :: 3.3
+Programming Language :: Python :: 3.4
+Programming Language :: Python :: 3.5
+Programming Language :: Python :: Implementation :: CPython
 Topic :: Software Development
 Topic :: Scientific/Engineering
 Operating System :: Microsoft :: Windows
@@ -48,7 +56,7 @@ Operating System :: MacOS
 """
 
 MAJOR               = 1
-MINOR               = 10
+MINOR               = 11
 MICRO               = 0
 ISRELEASED          = False
 VERSION             = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
@@ -213,7 +221,6 @@ def setup_package():
         platforms = ["Windows", "Linux", "Solaris", "Mac OS-X", "Unix"],
         test_suite='nose.collector',
         cmdclass={"sdist": sdist_checked},
-        package_data={'numpy.core': ['libopenblaspy.dll']},
     )
 
     # Run build
@@ -230,8 +237,12 @@ def setup_package():
         FULLVERSION, GIT_REVISION = get_version_info()
         metadata['version'] = FULLVERSION
     else:
-        if len(sys.argv) >= 2 and sys.argv[1] == 'bdist_wheel':
-            # bdist_wheel needs setuptools
+        if (len(sys.argv) >= 2 and sys.argv[1] == 'bdist_wheel' or
+                sys.version_info[0] < 3 and sys.platform == "win32"):
+            # bdist_wheel and the MS python2.7 VS sdk needs setuptools
+            # the latter can also be triggered by (see python issue23246)
+            # SET DISTUTILS_USE_SDK=1
+            # SET MSSdk=1
             import setuptools
         from numpy.distutils.core import setup
         cwd = os.path.abspath(os.path.dirname(__file__))

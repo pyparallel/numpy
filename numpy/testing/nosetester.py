@@ -10,7 +10,7 @@ import os
 import sys
 import warnings
 from numpy.compat import basestring
-from numpy import ModuleDeprecationWarning
+import numpy as np
 
 
 def get_package_name(filepath):
@@ -67,10 +67,9 @@ def import_nose():
             fine_nose = False
 
     if not fine_nose:
-        msg = 'Need nose >= %d.%d.%d for tests - see ' \
-              'http://somethingaboutorange.com/mrl/projects/nose' % \
-              minimum_nose_version
-
+        msg = ('Need nose >= %d.%d.%d for tests - see '
+               'http://somethingaboutorange.com/mrl/projects/nose' %
+               minimum_nose_version)
         raise ImportError(msg)
 
     return nose
@@ -152,7 +151,7 @@ class NoseTester(object):
         The package to test. If a string, this should be the full path to
         the package. If None (default), `package` is set to the module from
         which `NoseTester` is initialized.
-    raise_warnings : str or sequence of warnings, optional
+    raise_warnings : None, str or sequence of warnings, optional
         This specifies which warnings to configure as 'raise' instead
         of 'warn' during the test execution.  Valid strings are:
 
@@ -164,11 +163,10 @@ class NoseTester(object):
     Notes
     -----
     The default for `raise_warnings` is
-    ``(DeprecationWarning, RuntimeWarning)`` for the master branch of NumPy,
-    and ``()`` for maintenance branches and released versions.  The purpose
-    of this switching behavior is to catch as many warnings as possible
-    during development, but not give problems for packaging of released
-    versions.
+    ``(DeprecationWarning, RuntimeWarning)`` for development versions of NumPy,
+    and ``()`` for released versions.  The purpose of this switching behavior
+    is to catch as many warnings as possible during development, but not give
+    problems for packaging of released versions.
 
     """
     # Stuff to exclude from tests. These are from numpy.distutils
@@ -178,7 +176,13 @@ class NoseTester(object):
                 'pyrex_ext',
                 'swig_ext']
 
-    def __init__(self, package=None, raise_warnings="develop"):
+    def __init__(self, package=None, raise_warnings=None):
+        if raise_warnings is None and (
+                not hasattr(np, '__version__') or '.dev0' in np.__version__):
+            raise_warnings = "develop"
+        elif raise_warnings is None:
+            raise_warnings = "release"
+
         package_name = None
         if package is None:
             f = sys._getframe(1)
@@ -293,7 +297,7 @@ class NoseTester(object):
             argv += ['--exclude', ename]
         # our way of doing coverage
         if coverage:
-            argv+=['--cover-package=%s' % self.package_name, '--with-coverage',
+            argv += ['--cover-package=%s' % self.package_name, '--with-coverage',
                    '--cover-tests', '--cover-erase']
         # construct list of plugins
         import nose.plugins.builtin
@@ -309,8 +313,8 @@ class NoseTester(object):
             # use standard doctesting
             if doctests and not doctest_argv:
                 argv += ['--with-doctest']
-        else: # custom doctesting
-            if doctest_argv: # in fact the unplugger would take care of this
+        else:  # custom doctesting
+            if doctest_argv:  # in fact the unplugger would take care of this
                 argv.remove('--with-doctest')
             plugins += [Unplugger('doctest'), plug]
             if doctests:
@@ -402,16 +406,16 @@ class NoseTester(object):
 
         _warn_opts = dict(develop=(DeprecationWarning, RuntimeWarning),
                           release=())
-        if raise_warnings in _warn_opts.keys():
+        if isinstance(raise_warnings, basestring):
             raise_warnings = _warn_opts[raise_warnings]
 
         with warnings.catch_warnings():
             # Reset the warning filters to the default state,
             # so that running the tests is more repeatable.
             warnings.resetwarnings()
-            # If deprecation warnings are not set to 'error' below,
-            # at least set them to 'warn'.
-            warnings.filterwarnings('always', category=DeprecationWarning)
+            # Set all warnings to 'warn', this is because the default 'once'
+            # has the bad property of possibly shadowing later warnings.
+            warnings.filterwarnings('always')
             # Force the requested warnings to raise
             for warningtype in raise_warnings:
                 warnings.filterwarnings('error', category=warningtype)
@@ -419,12 +423,18 @@ class NoseTester(object):
             warnings.filterwarnings('ignore', message='Not importing directory')
             warnings.filterwarnings("ignore", message="numpy.dtype size changed")
             warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
-            warnings.filterwarnings("ignore", category=ModuleDeprecationWarning)
+            warnings.filterwarnings("ignore", category=np.ModuleDeprecationWarning)
             warnings.filterwarnings("ignore", category=FutureWarning)
             # Filter out boolean '-' deprecation messages. This allows
             # older versions of scipy to test without a flood of messages.
             warnings.filterwarnings("ignore", message=".*boolean negative.*")
             warnings.filterwarnings("ignore", message=".*boolean subtract.*")
+            # Filter out some deprecation warnings inside nose 1.3.7 when run
+            # on python 3.5b2. See
+            #     https://github.com/nose-devs/nose/issues/929
+            warnings.filterwarnings("ignore", message=".*getargspec.*",
+                                    category=DeprecationWarning,
+                                    module="nose\.")
 
             from .noseclasses import NumpyTestProgram
 

@@ -587,6 +587,15 @@ cdef class RandomState:
     array filled with generated values is returned. If `size` is a tuple,
     then an array with that shape is filled and returned.
 
+    *Compatibility Guarantee*
+    A fixed seed and a fixed series of calls to 'RandomState' methods using
+    the same parameters will always produce the same results up to roundoff
+    error except when the values were incorrect. Incorrect values will be
+    fixed and the NumPy version in which the fix was made will be noted in
+    the relevant docstring. Extension of existing parameter ranges and the
+    addition of new parameters is allowed as long the previous behavior
+    remains unchanged.
+
     Parameters
     ----------
     seed : {None, int, array_like}, optional
@@ -1084,6 +1093,12 @@ cdef class RandomState:
 
         if p is not None:
             d = len(p)
+
+            atol = np.sqrt(np.finfo(np.float64).eps)
+            if isinstance(p, np.ndarray):
+                if np.issubdtype(p.dtype, np.floating):
+                    atol = max(atol, np.sqrt(np.finfo(p.dtype).eps))
+
             p = <ndarray>PyArray_ContiguousFromObject(p, NPY_DOUBLE, 1, 1)
             pix = <double*>PyArray_DATA(p)
 
@@ -1093,7 +1108,7 @@ cdef class RandomState:
                 raise ValueError("a and p must have same size")
             if np.logical_or.reduce(p < 0):
                 raise ValueError("probabilities are not non-negative")
-            if abs(kahan_sum(pix, d) - 1.) > 1e-8:
+            if abs(kahan_sum(pix, d) - 1.) > atol:
                 raise ValueError("probabilities do not sum to 1")
 
         shape = size
@@ -2430,7 +2445,7 @@ cdef class RandomState:
         For a one-sided t-test, how far out in the distribution does the t
         statistic appear?
 
-        >>> >>> np.sum(s<t) / float(len(s))
+        >>> np.sum(s<t) / float(len(s))
         0.0090699999999999999  #random
 
         So the p-value is about 0.009, which says the null hypothesis has a
@@ -3072,7 +3087,7 @@ cdef class RandomState:
         ...    means.append(a.mean())
         ...    maxima.append(a.max())
         >>> count, bins, ignored = plt.hist(maxima, 30, normed=True)
-        >>> beta = np.std(maxima)*np.pi/np.sqrt(6)
+        >>> beta = np.std(maxima) * np.sqrt(6) / np.pi
         >>> mu = np.mean(maxima) - 0.57721*beta
         >>> plt.plot(bins, (1/beta)*np.exp(-(bins - mu)/beta)
         ...          * np.exp(-np.exp(-(bins - mu)/beta)),
@@ -3285,7 +3300,7 @@ cdef class RandomState:
         ...    b.append(np.product(a))
 
         >>> b = np.array(b) / np.min(b) # scale values to be positive
-        >>> count, bins, ignored = plt.hist(b, 100, normed=True, align='center')
+        >>> count, bins, ignored = plt.hist(b, 100, normed=True, align='mid')
         >>> sigma = np.std(np.log(b))
         >>> mu = np.mean(np.log(b))
 
@@ -3514,7 +3529,7 @@ cdef class RandomState:
 
         .. math:: P(x;l, m, r) = \\begin{cases}
                   \\frac{2(x-l)}{(r-l)(m-l)}& \\text{for $l \\leq x \\leq m$},\\\\
-                  \\frac{2(m-x)}{(r-l)(r-m)}& \\text{for $m \\leq x \\leq r$},\\\\
+                  \\frac{2(r-x)}{(r-l)(r-m)}& \\text{for $m \\leq x \\leq r$},\\\\
                   0& \\text{otherwise}.
                   \\end{cases}
 

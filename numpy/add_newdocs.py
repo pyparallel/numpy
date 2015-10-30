@@ -28,9 +28,9 @@ add_newdoc('numpy.core', 'flatiter',
     It allows iterating over the array as if it were a 1-D array,
     either in a for-loop or by calling its `next` method.
 
-    Iteration is done in C-contiguous style, with the last index varying the
-    fastest. The iterator can also be indexed using basic slicing or
-    advanced indexing.
+    Iteration is done in row-major, C-style order (the last
+    index varying the fastest). The iterator can also be indexed using
+    basic slicing or advanced indexing.
 
     See Also
     --------
@@ -745,14 +745,15 @@ add_newdoc('numpy.core.multiarray', 'empty',
     dtype : data-type, optional
         Desired output data-type.
     order : {'C', 'F'}, optional
-        Whether to store multi-dimensional data in C (row-major) or
-        Fortran (column-major) order in memory.
+        Whether to store multi-dimensional data in row-major
+        (C-style) or column-major (Fortran-style) order in
+        memory.
 
     Returns
     -------
     out : ndarray
-        Array of uninitialized (arbitrary) data with the given
-        shape, dtype, and order.
+        Array of uninitialized (arbitrary) data of the given shape, dtype, and
+        order.  Object arrays will be initialized to None.
 
     See Also
     --------
@@ -789,14 +790,16 @@ add_newdoc('numpy.core.multiarray', 'empty_like',
         The shape and data-type of `a` define these same attributes of the
         returned array.
     dtype : data-type, optional
-        .. versionadded:: 1.6.0
         Overrides the data type of the result.
-    order : {'C', 'F', 'A', or 'K'}, optional
+
         .. versionadded:: 1.6.0
+    order : {'C', 'F', 'A', or 'K'}, optional
         Overrides the memory layout of the result. 'C' means C-order,
         'F' means F-order, 'A' means 'F' if ``a`` is Fortran contiguous,
         'C' otherwise. 'K' means match the layout of ``a`` as closely
         as possible.
+
+        .. versionadded:: 1.6.0
     subok : bool, optional.
         If True, then the newly created array will use the sub-class
         type of 'a', otherwise it will be a base-class array. Defaults
@@ -1225,7 +1228,7 @@ add_newdoc('numpy.core', 'inner',
     Parameters
     ----------
     a, b : array_like
-        If `a` and `b` are nonscalar, their last dimensions of must match.
+        If `a` and `b` are nonscalar, their last dimensions must match.
 
     Returns
     -------
@@ -1702,6 +1705,7 @@ add_newdoc('numpy.core.multiarray', 'promote_types',
     Notes
     -----
     .. versionadded:: 1.6.0
+
     Starting in NumPy 1.9, promote_types function now returns a valid string
     length when given an integer or float dtype as one argument and a string
     dtype as another argument. Previously it always returned the input string
@@ -2104,7 +2108,7 @@ add_newdoc('numpy.core', 'einsum',
 
     Using the Einstein summation convention, many common multi-dimensional
     array operations can be represented in a simple fashion.  This function
-    provides a way compute such summations. The best way to understand this
+    provides a way to compute such summations. The best way to understand this
     function is to try the examples below, which show how many common NumPy
     functions can be implemented as calls to `einsum`.
 
@@ -2419,7 +2423,7 @@ add_newdoc('numpy.core.multiarray', 'ndarray',
     strides : tuple of ints, optional
         Strides of data in memory.
     order : {'C', 'F'}, optional
-        Row-major or column-major order.
+        Row-major (C-style) or column-major (Fortran-style) order.
 
     Attributes
     ----------
@@ -3238,7 +3242,7 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('astype',
     -------
     arr_t : ndarray
         Unless `copy` is False and the other conditions for returning the input
-        array are satisfied (see description for `copy` input paramter), `arr_t`
+        array are satisfied (see description for `copy` input parameter), `arr_t`
         is a new array of the same shape as the input array, with dtype, order
         given by `dtype`, `order`.
 
@@ -3564,9 +3568,9 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('flatten',
     Parameters
     ----------
     order : {'C', 'F', 'A'}, optional
-        Whether to flatten in C (row-major), Fortran (column-major) order,
-        or preserve the C/Fortran ordering from `a`.
-        The default is 'C'.
+        Whether to flatten in row-major (C-style) or
+        column-major (Fortran-style) order or preserve the
+        C/Fortran ordering from `a`.  The default is 'C'.
 
     Returns
     -------
@@ -3735,37 +3739,6 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('itemset',
     """))
 
 
-add_newdoc('numpy.core.multiarray', 'ndarray', ('setasflat',
-    """
-    a.setasflat(arr)
-
-    Equivalent to a.flat = arr.flat, but is generally more efficient.
-    This function does not check for overlap, so if ``arr`` and ``a``
-    are viewing the same data with different strides, the results will
-    be unpredictable.
-
-    Parameters
-    ----------
-    arr : array_like
-        The array to copy into a.
-
-    Examples
-    --------
-    >>> a = np.arange(2*4).reshape(2,4)[:,:-1]; a
-    array([[0, 1, 2],
-           [4, 5, 6]])
-    >>> b = np.arange(3*3, dtype='f4').reshape(3,3).T[::-1,:-1]; b
-    array([[ 2.,  5.],
-           [ 1.,  4.],
-           [ 0.,  3.]], dtype=float32)
-    >>> a.setasflat(b)
-    >>> a
-    array([[2, 5, 1],
-           [4, 0, 3]])
-
-    """))
-
-
 add_newdoc('numpy.core.multiarray', 'ndarray', ('max',
     """
     a.max(axis=None, out=None)
@@ -3811,23 +3784,39 @@ add_newdoc('numpy.core.multiarray', 'ndarray', ('min',
     """))
 
 
-add_newdoc('numpy.core.multiarray', 'may_share_memory',
+add_newdoc('numpy.core.multiarray', 'shares_memory',
     """
-    Determine if two arrays can share memory
+    shares_memory(a, b, max_work=None)
 
-    The memory-bounds of a and b are computed.  If they overlap then
-    this function returns True.  Otherwise, it returns False.
-
-    A return of True does not necessarily mean that the two arrays
-    share any element.  It just means that they *might*.
+    Determine if two arrays share memory
 
     Parameters
     ----------
     a, b : ndarray
+        Input arrays
+    max_work : int, optional
+        Effort to spend on solving the overlap problem (maximum number
+        of candidate solutions to consider). The following special
+        values are recognized:
+
+        max_work=MAY_SHARE_EXACT  (default)
+            The problem is solved exactly. In this case, the function returns
+            True only if there is an element shared between the arrays.
+        max_work=MAY_SHARE_BOUNDS
+            Only the memory bounds of a and b are checked.
+
+    Raises
+    ------
+    numpy.TooHardError
+        Exceeded max_work.
 
     Returns
     -------
     out : bool
+
+    See Also
+    --------
+    may_share_memory
 
     Examples
     --------
@@ -5069,9 +5058,9 @@ add_newdoc('numpy.core.multiarray', 'bincount',
     weights : array_like, optional
         Weights, array of the same shape as `x`.
     minlength : int, optional
-        .. versionadded:: 1.6.0
-
         A minimum number of bins for the output array.
+
+        .. versionadded:: 1.6.0
 
     Returns
     -------
@@ -5144,8 +5133,9 @@ add_newdoc('numpy.core.multiarray', 'ravel_multi_index',
         In 'clip' mode, a negative index which would normally
         wrap will clip to 0 instead.
     order : {'C', 'F'}, optional
-        Determines whether the multi-index should be viewed as indexing in
-        C (row-major) order or FORTRAN (column-major) order.
+        Determines whether the multi-index should be viewed as
+        indexing in row-major (C-style) or column-major
+        (Fortran-style) order.
 
     Returns
     -------
@@ -5193,10 +5183,10 @@ add_newdoc('numpy.core.multiarray', 'unravel_index',
     dims : tuple of ints
         The shape of the array to use for unraveling ``indices``.
     order : {'C', 'F'}, optional
-        .. versionadded:: 1.6.0
-
         Determines whether the indices should be viewed as indexing in
-        C (row-major) order or FORTRAN (column-major) order.
+        row-major (C-style) or column-major (Fortran-style) order.
+
+        .. versionadded:: 1.6.0
 
     Returns
     -------
@@ -6233,7 +6223,7 @@ add_newdoc('numpy.core.multiarray', 'dtype', ('itemsize',
 
 add_newdoc('numpy.core.multiarray', 'dtype', ('kind',
     """
-    A character code (one of 'biufcOSUV') identifying the general kind of data.
+    A character code (one of 'biufcmMOSUV') identifying the general kind of data.
 
     =  ======================
     b  boolean
@@ -6241,6 +6231,8 @@ add_newdoc('numpy.core.multiarray', 'dtype', ('kind',
     u  unsigned integer
     f  floating-point
     c  complex floating-point
+    m  timedelta
+    M  datetime
     O  object
     S  (byte-)string
     U  Unicode

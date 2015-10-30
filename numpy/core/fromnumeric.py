@@ -848,7 +848,7 @@ def argsort(a, axis=-1, kind='quicksort', order=None):
     -------
     index_array : ndarray, int
         Array of indices that sort `a` along the specified axis.
-        In other words, ``a[index_array]`` yields a sorted `a`.
+        If `a` is one-dimensional, ``a[index_array]`` yields a sorted `a`.
 
     See Also
     --------
@@ -1049,9 +1049,10 @@ def searchsorted(a, v, side='left', sorter=None):
         If 'right', return the last such index.  If there is no suitable
         index, return either 0 or N (where N is the length of `a`).
     sorter : 1-D array_like, optional
-        .. versionadded:: 1.7.0
         Optional array of integer indices that sort array a into ascending
         order. They are typically the result of argsort.
+
+        .. versionadded:: 1.7.0
 
     Returns
     -------
@@ -1370,8 +1371,7 @@ def trace(a, offset=0, axis1=0, axis2=1, dtype=None, out=None):
 
 
 def ravel(a, order='C'):
-    """
-    Return a flattened array.
+    """Return a contiguous flattened array.
 
     A 1-D array, containing the elements of the input, is returned.  A copy is
     made only if needed.
@@ -1386,18 +1386,21 @@ def ravel(a, order='C'):
         Input array.  The elements in `a` are read in the order specified by
         `order`, and packed as a 1-D array.
     order : {'C','F', 'A', 'K'}, optional
-        The elements of `a` are read using this index order. 'C' means to
-        index the elements in C-like order, with the last axis index changing
-        fastest, back to the first axis index changing slowest.   'F' means to
-        index the elements in Fortran-like index order, with the first index
-        changing fastest, and the last index changing slowest. Note that the
-        'C' and 'F' options take no account of the memory layout of the
-        underlying array, and only refer to the order of axis indexing.
-        'A' means to read the elements in Fortran-like index order if `a` is
-        Fortran *contiguous* in memory, C-like order otherwise.  'K' means to
-        read the elements in the order they occur in memory, except for
-        reversing the data when strides are negative.  By default, 'C' index
-        order is used.
+
+        The elements of `a` are read using this index order. 'C' means
+        to index the elements in row-major, C-style order,
+        with the last axis index changing fastest, back to the first
+        axis index changing slowest.  'F' means to index the elements
+        in column-major, Fortran-style order, with the
+        first index changing fastest, and the last index changing
+        slowest. Note that the 'C' and 'F' options take no account of
+        the memory layout of the underlying array, and only refer to
+        the order of axis indexing.  'A' means to read the elements in
+        Fortran-like index order if `a` is Fortran *contiguous* in
+        memory, C-like order otherwise.  'K' means to read the
+        elements in the order they occur in memory, except for
+        reversing the data when strides are negative.  By default, 'C'
+        index order is used.
 
     Returns
     -------
@@ -1412,14 +1415,19 @@ def ravel(a, order='C'):
     ndarray.flat : 1-D iterator over an array.
     ndarray.flatten : 1-D array copy of the elements of an array
                       in row-major order.
+    ndarray.reshape : Change the shape of an array without changing its data.
 
     Notes
     -----
-    In C-like (row-major) order, in two dimensions, the row index varies the
-    slowest, and the column index the quickest.  This can be generalized to
-    multiple dimensions, where row-major order implies that the index along the
-    first axis varies slowest, and the index along the last quickest.  The
-    opposite holds for Fortran-like, or column-major, index ordering.
+    In row-major, C-style order, in two dimensions, the row index
+    varies the slowest, and the column index the quickest.  This can
+    be generalized to multiple dimensions, where row-major order
+    implies that the index along the first axis varies slowest, and
+    the index along the last quickest.  The opposite holds for
+    column-major, Fortran-style index ordering.
+
+    When a view is desired in as many cases as possible, ``arr.reshape(-1)``
+    may be preferable.
 
     Examples
     --------
@@ -1473,9 +1481,11 @@ def nonzero(a):
     """
     Return the indices of the elements that are non-zero.
 
-    Returns a tuple of arrays, one for each dimension of `a`, containing
-    the indices of the non-zero elements in that dimension. The
-    corresponding non-zero values can be obtained with::
+    Returns a tuple of arrays, one for each dimension of `a`,
+    containing the indices of the non-zero elements in that
+    dimension. The values in `a` are always tested and returned in
+    row-major, C-style order. The corresponding non-zero
+    values can be obtained with::
 
         a[nonzero(a)]
 
@@ -2063,7 +2073,7 @@ def cumsum(a, axis=None, dtype=None, out=None):
 
     trapz : Integration of array values using the composite trapezoidal rule.
 
-    diff :  Calculate the n-th order discrete difference along given axis.
+    diff :  Calculate the n-th discrete difference along given axis.
 
     Notes
     -----
@@ -2624,6 +2634,7 @@ def rank(a):
     0
 
     """
+    # 2014-04-12, 1.9
     warnings.warn(
         "`rank` is deprecated; use the `ndim` attribute or function instead. "
         "To find the rank of a matrix see `numpy.linalg.matrix_rank`.",

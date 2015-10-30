@@ -111,6 +111,15 @@ class TestArraySplit(TestCase):
         compare_results(res, desired)
         assert_(a.dtype.type is res[-1].dtype.type)
 
+        # Same thing for manual splits:
+        res = assert_warns(FutureWarning, array_split, a, [0, 1, 2], axis=0)
+
+        # After removing the FutureWarning, the last should be zeros((0, 10))
+        desired = [np.array([]), np.array([np.arange(10)]),
+                   np.array([np.arange(10)])]
+        compare_results(res, desired)
+        assert_(a.dtype.type is res[-1].dtype.type)
+
     def test_integer_split_2D_cols(self):
         a = np.array([np.arange(10), np.arange(10)])
         res = array_split(a, 3, axis=-1)
@@ -332,7 +341,10 @@ class TestTile(TestCase):
 
     def test_empty(self):
         a = np.array([[[]]])
+        b = np.array([[], []])
+        c = tile(b, 2).shape
         d = tile(a, (3, 2, 5)).shape
+        assert_equal(c, (2, 0))
         assert_equal(d, (3, 2, 0))
 
     def test_kroncompare(self):

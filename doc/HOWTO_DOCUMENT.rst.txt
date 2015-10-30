@@ -455,7 +455,8 @@ The sections of the docstring are:
    The examples may assume that ``import numpy as np`` is executed before
    the example code in *numpy*. Additional examples may make use of
    *matplotlib* for plotting, but should import it explicitly, e.g.,
-   ``import matplotlib.pyplot as plt``.
+   ``import matplotlib.pyplot as plt``. All other imports, including the
+   demonstrated function, must be explicit.
 
 
 Documenting classes
@@ -619,10 +620,6 @@ Other points to keep in mind
   Use these sparingly, as they do not look very good in text terminals
   and are not often necessary. One situation in which a warning can
   be useful is for marking a known bug that is not yet fixed.
-
-* Questions and Answers : For general questions on how to write docstrings
-  that are not answered in this document, refer to
-  `<http://docs.scipy.org/numpy/Questions+Answers/>`_.
 
 * array_like : For functions that take arguments which can have not only
   a type `ndarray`, but also types that can be converted to an ndarray

@@ -3,9 +3,8 @@ from __future__ import division, absolute_import, print_function
 import numpy as np
 import numpy.ma as ma
 from numpy.ma.mrecords import MaskedRecords
-from numpy.ma.testutils import (
-    run_module_suite, TestCase, assert_, assert_equal
-    )
+from numpy.ma.testutils import assert_equal
+from numpy.testing import TestCase, run_module_suite, assert_
 from numpy.lib.recfunctions import (
     drop_fields, rename_fields, get_fieldstructure, recursive_fill_fields,
     find_duplicates, merge_arrays, append_fields, stack_arrays, join_by
@@ -719,16 +718,6 @@ class TestAppendFieldsObj(TestCase):
         test = append_fields(x, 'C', data=y, usemask=False)
         control = np.array([(obj, 1.0, 10), (obj, 2.0, 20)],
                            dtype=[('A', object), ('B', float), ('C', int)])
-        assert_equal(test, control)
-
-    def test_append_with_objects(self):
-        "Test append_fields when the appended data contains objects"
-        obj = self.data['obj']
-        x = np.array([(10, 1.), (20, 2.)], dtype=[('A', int), ('B', float)])
-        y = np.array([obj, obj], dtype=object)
-        test = append_fields(x, 'C', data=y, dtypes=object, usemask=False)
-        control = np.array([(10, 1.0, obj), (20, 2.0, obj)],
-                           dtype=[('A', int), ('B', float), ('C', object)])
         assert_equal(test, control)
 
 if __name__ == '__main__':

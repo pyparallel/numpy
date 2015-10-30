@@ -238,8 +238,8 @@ def tensorsolve(a, b, axes=None):
         Coefficient tensor, of shape ``b.shape + Q``. `Q`, a tuple, equals
         the shape of that sub-tensor of `a` consisting of the appropriate
         number of its rightmost indices, and must be such that
-       ``prod(Q) == prod(b.shape)`` (in which sense `a` is said to be
-       'square').
+        ``prod(Q) == prod(b.shape)`` (in which sense `a` is said to be
+        'square').
     b : array_like
         Right-hand tensor, which can be of any shape.
     axes : tuple of ints, optional
@@ -321,6 +321,7 @@ def solve(a, b):
     -----
 
     .. versionadded:: 1.8.0
+
     Broadcasting rules apply, see the `numpy.linalg` documentation for
     details.
 
@@ -480,6 +481,7 @@ def inv(a):
     -----
 
     .. versionadded:: 1.8.0
+
     Broadcasting rules apply, see the `numpy.linalg` documentation for
     details.
 
@@ -559,6 +561,7 @@ def cholesky(a):
     -----
 
     .. versionadded:: 1.8.0
+
     Broadcasting rules apply, see the `numpy.linalg` documentation for
     details.
 
@@ -730,12 +733,14 @@ def qr(a, mode='reduced'):
     """
     if mode not in ('reduced', 'complete', 'r', 'raw'):
         if mode in ('f', 'full'):
+            # 2013-04-01, 1.8
             msg = "".join((
                     "The 'full' option is deprecated in favor of 'reduced'.\n",
                     "For backward compatibility let mode default."))
             warnings.warn(msg, DeprecationWarning)
             mode = 'reduced'
         elif mode in ('e', 'economic'):
+            # 2013-04-01, 1.8
             msg = "The 'economic' option is deprecated.",
             warnings.warn(msg, DeprecationWarning)
             mode = 'economic'
@@ -858,6 +863,7 @@ def eigvals(a):
     -----
 
     .. versionadded:: 1.8.0
+
     Broadcasting rules apply, see the `numpy.linalg` documentation for
     details.
 
@@ -929,7 +935,7 @@ def eigvalsh(a, UPLO='L'):
     Returns
     -------
     w : (..., M,) ndarray
-        The eigenvalues, not necessarily ordered, each repeated according to
+        The eigenvalues in ascending order, each repeated according to
         its multiplicity.
 
     Raises
@@ -948,17 +954,18 @@ def eigvalsh(a, UPLO='L'):
     -----
 
     .. versionadded:: 1.8.0
+
     Broadcasting rules apply, see the `numpy.linalg` documentation for
     details.
 
-    The eigenvalues are computed using LAPACK routines _ssyevd, _heevd
+    The eigenvalues are computed using LAPACK routines _syevd, _heevd
 
     Examples
     --------
     >>> from numpy import linalg as LA
     >>> a = np.array([[1, -2j], [2j, 5]])
     >>> LA.eigvalsh(a)
-    array([ 0.17157288+0.j,  5.82842712+0.j])
+    array([ 0.17157288,  5.82842712])
 
     """
     UPLO = UPLO.upper()
@@ -1005,9 +1012,10 @@ def eig(a):
     w : (..., M) array
         The eigenvalues, each repeated according to its multiplicity.
         The eigenvalues are not necessarily ordered. The resulting
-        array will be always be of complex type. When `a` is real
-        the resulting eigenvalues will be real (0 imaginary part) or
-        occur in conjugate pairs
+        array will be of complex type, unless the imaginary part is
+        zero in which case it will be cast to a real type. When `a`
+        is real the resulting eigenvalues will be real (0 imaginary
+        part) or occur in conjugate pairs
 
     v : (..., M, M) array
         The normalized (unit "length") eigenvectors, such that the
@@ -1023,16 +1031,17 @@ def eig(a):
     --------
     eigvals : eigenvalues of a non-symmetric array.
 
-    eigh : eigenvalues and eigenvectors of a symmetric or Hermitian 
-       (conjugate symmetric) array.
+    eigh : eigenvalues and eigenvectors of a symmetric or Hermitian
+           (conjugate symmetric) array.
 
     eigvalsh : eigenvalues of a symmetric or Hermitian (conjugate symmetric)
-       array.
+               array.
 
     Notes
     -----
 
     .. versionadded:: 1.8.0
+
     Broadcasting rules apply, see the `numpy.linalg` documentation for
     details.
 
@@ -1149,7 +1158,8 @@ def eigh(a, UPLO='L'):
     Returns
     -------
     w : (..., M) ndarray
-        The eigenvalues, not necessarily ordered.
+        The eigenvalues in ascending order, each repeated according to
+        its multiplicity.
     v : {(..., M, M) ndarray, (..., M, M) matrix}
         The column ``v[:, i]`` is the normalized eigenvector corresponding
         to the eigenvalue ``w[i]``.  Will return a matrix object if `a` is
@@ -1170,10 +1180,11 @@ def eigh(a, UPLO='L'):
     -----
 
     .. versionadded:: 1.8.0
+
     Broadcasting rules apply, see the `numpy.linalg` documentation for
     details.
 
-    The eigenvalues/eigenvectors are computed using LAPACK routines _ssyevd,
+    The eigenvalues/eigenvectors are computed using LAPACK routines _syevd,
     _heevd
 
     The eigenvalues of real symmetric or complex Hermitian matrices are
@@ -1279,6 +1290,7 @@ def svd(a, full_matrices=1, compute_uv=1):
     -----
 
     .. versionadded:: 1.8.0
+
     Broadcasting rules apply, see the `numpy.linalg` documentation for
     details.
 
@@ -1370,7 +1382,7 @@ def cond(x, p=None):
 
     Parameters
     ----------
-    x : (M, N) array_like
+    x : (..., M, N) array_like
         The matrix whose condition number is sought.
     p : {None, 1, -1, 2, -2, inf, -inf, 'fro'}, optional
         Order of the norm:
@@ -1439,12 +1451,12 @@ def cond(x, p=None):
     0.70710678118654746
 
     """
-    x = asarray(x) # in case we have a matrix
+    x = asarray(x)  # in case we have a matrix
     if p is None:
         s = svd(x, compute_uv=False)
-        return s[0]/s[-1]
+        return s[..., 0]/s[..., -1]
     else:
-        return norm(x, p)*norm(inv(x), p)
+        return norm(x, p, axis=(-2, -1)) * norm(inv(x), p, axis=(-2, -1))
 
 
 def matrix_rank(M, tol=None):
@@ -1650,10 +1662,12 @@ def slogdet(a):
     -----
 
     .. versionadded:: 1.8.0
+
     Broadcasting rules apply, see the `numpy.linalg` documentation for
     details.
 
     .. versionadded:: 1.6.0.
+
     The determinant is computed via LU factorization using the LAPACK
     routine z/dgetrf.
 
@@ -1729,6 +1743,7 @@ def det(a):
     -----
 
     .. versionadded:: 1.8.0
+
     Broadcasting rules apply, see the `numpy.linalg` documentation for
     details.
 
@@ -1747,7 +1762,7 @@ def det(a):
 
     >>> a = np.array([ [[1, 2], [3, 4]], [[1, 2], [2, 1]], [[1, 3], [3, 1]] ])
     >>> a.shape
-    (2, 2, 2
+    (3, 2, 2)
     >>> np.linalg.det(a)
     array([-2., -3., -8.])
 
@@ -1980,10 +1995,11 @@ def norm(x, ord=None, axis=None, keepdims=False):
         are computed.  If `axis` is None then either a vector norm (when `x`
         is 1-D) or a matrix norm (when `x` is 2-D) is returned.
     keepdims : bool, optional
-        .. versionadded:: 1.10.0
         If this is set to True, the axes which are normed over are left in the
         result as dimensions with size one.  With this option the result will
         broadcast correctly against the original `x`.
+
+        .. versionadded:: 1.10.0
 
     Returns
     -------

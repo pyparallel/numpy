@@ -69,9 +69,8 @@ class Arrayterator(object):
 
     Examples
     --------
-    >>> import numpy as np
     >>> a = np.arange(3 * 4 * 5 * 6).reshape(3, 4, 5, 6)
-    >>> a_itor = np.lib.arrayterator.Arrayterator(a, 2)
+    >>> a_itor = np.lib.Arrayterator(a, 2)
     >>> a_itor.shape
     (3, 4, 5, 6)
 
@@ -149,13 +148,13 @@ class Arrayterator(object):
 
         See Also
         --------
-        `Arrayterator`
+        Arrayterator
         flatiter
 
         Examples
         --------
         >>> a = np.arange(3 * 4 * 5 * 6).reshape(3, 4, 5, 6)
-        >>> a_itor = np.lib.arrayterator.Arrayterator(a, 2)
+        >>> a_itor = np.lib.Arrayterator(a, 2)
 
         >>> for subarr in a_itor.flat:
         ...     if not subarr:
@@ -182,7 +181,7 @@ class Arrayterator(object):
     def __iter__(self):
         # Skip arrays with degenerate dimensions
         if [dim for dim in self.shape if dim <= 0]:
-            raise StopIteration
+            return
 
         start = self.start[:]
         stop = self.stop[:]
@@ -223,4 +222,4 @@ class Arrayterator(object):
                     start[i] = self.start[i]
                     start[i-1] += self.step[i-1]
             if start[0] >= self.stop[0]:
-                raise StopIteration
+                return

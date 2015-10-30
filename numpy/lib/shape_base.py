@@ -424,7 +424,7 @@ def array_split(ary, indices_or_sections, axis=0):
     # This "kludge" was introduced here to replace arrays shaped (0, 10)
     # or similar with an array shaped (0,).
     # There seems no need for this, so give a FutureWarning to remove later.
-    if sub_arys[-1].size == 0 and sub_arys[-1].ndim != 1:
+    if any(arr.size == 0 and arr.ndim != 1 for arr in sub_arys):
         warnings.warn("in the future np.array_split will retain the shape of "
                       "arrays with a zero size, instead of replacing them by "
                       "`array([])`, which always has a shape of (0,).",
@@ -857,16 +857,16 @@ def tile(A, reps):
         # numpy array and the repetitions are 1 in all dimensions
         return _nx.array(A, copy=True, subok=True, ndmin=d)
     else:
+        # Note that no copy of zero-sized arrays is made. However since they
+        # have no data there is no risk of an inadvertent overwrite.
         c = _nx.array(A, copy=False, subok=True, ndmin=d)
-    shape = list(c.shape)
-    n = max(c.size, 1)
     if (d < c.ndim):
         tup = (1,)*(c.ndim-d) + tup
-    for i, nrep in enumerate(tup):
-        if nrep != 1:
-            c = c.reshape(-1, n).repeat(nrep, 0)
-        dim_in = shape[i]
-        dim_out = dim_in*nrep
-        shape[i] = dim_out
-        n //= max(dim_in, 1)
-    return c.reshape(shape)
+    shape_out = tuple(s*t for s, t in zip(c.shape, tup))
+    n = c.size
+    if n > 0:
+        for dim_in, nrep in zip(c.shape, tup):
+            if nrep != 1:
+                c = c.reshape(-1, n).repeat(nrep, 0)
+            n //= dim_in
+    return c.reshape(shape_out)

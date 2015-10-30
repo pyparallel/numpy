@@ -32,7 +32,7 @@ Doc wiki
 
 Release Scripts
 ---------------
-* https://github.com/certik/numpy-vendor
+* https://github.com/numpy/numpy-vendor
 
 
 Supported platforms and versions
@@ -196,16 +196,6 @@ After a date is set, create a new maintenance/x.y.z branch, add new empty
 release notes for the next version in the master branch and update the Trac
 Milestones.
 
-Handle test warnings
---------------------
-The default behavior of the test suite in the master branch is to report errors
-for DeprecationWarnings and RuntimeWarnings that are issued.  For a released
-version this is not desired.  Therefore any known warnings should be solved or
-explicitly silenced before making the release branch, then when the branch is
-made, the default behavior should be switched to not raise errors.  This is
-done in the constructor of the NoseTester class in numpy/testing/nosetester.py,
-by replacing ``raise_warnings="develop"`` with ``raise_warnings="release"``.
-
 Make sure current trunk builds a package correctly
 --------------------------------------------------
 ::
@@ -220,12 +210,6 @@ best to read the pavement.py script.
 .. note:: The following steps are repeated for the beta(s), release
    candidates(s) and the final release.
 
-Merge doc wiki edits
---------------------
-The edits in the documentation wiki suitable for merging should be merged,
-ideally just before making the release branch. How to do this is described in
-detail in doc/HOWTO_MERGE_WIKI_DOCS.txt.
-
 Check that docs can be built
 ----------------------------
 Do::
@@ -233,7 +217,9 @@ Do::
     cd doc/
     make dist
 
-to check that the documentation is in a buildable state.
+to check that the documentation is in a buildable state.  See
+doc/HOWTO_BUILD_DOCS.rst.txt for more details and for how to update
+http://docs.scipy.org.
 
 Check deprecations
 ------------------
@@ -259,15 +245,16 @@ There are three steps to the process.
    not backward compatible.
 
 2. If the C_API_VERSION in the first step has changed, or if the hash of
-   the API has changed, the cversions.txt file needs to be updated. To
-   check the hash, run the script numpy/core/cversions.py and note the api hash
-   that is printed. If that hash does not match the last hash in cversions.txt
-   the hash has changed. Using both the appropriate C_API_VERSION and hash,
-   add a new entry to cversions.txt. If the API version was not changed, but
-   the hash differs, you will need to comment out the previous entry for that
-   API version. For instance, in NumPy 1.9 annotations were added, which
-   changed the hash, but the API was the same as in 1.8. The hash serves as a
-   check for API changes, but it is not definitive.
+   the API has changed, the cversions.txt file needs to be updated. To check
+   the hash, run the script numpy/core/cversions.py and note the api hash that
+   is printed. If that hash does not match the last hash in
+   numpy/core/code_generators/cversions.txt the hash has changed. Using both
+   the appropriate C_API_VERSION and hash, add a new entry to cversions.txt.
+   If the API version was not changed, but the hash differs, you will need to
+   comment out the previous entry for that API version. For instance, in NumPy
+   1.9 annotations were added, which changed the hash, but the API was the
+   same as in 1.8. The hash serves as a check for API changes, but it is not
+   definitive.
 
    If steps 1 and 2 are done correctly, compiling the release should not give
    a warning "API mismatch detect at the beginning of the build.
@@ -307,8 +294,17 @@ Now, set ``release=True`` in setup.py, then
 ::
 
     git commit -m "REL: Release." setup.py
-    git tag <version>
+    git tag -s <version>
     git push origin <version>
+
+Note: ``git tag -s`` creates a signed tag - make sure your PGP key is public.
+
+Apply patch to fix bogus strides
+--------------------------------
+NPY_RELAXED_STRIDE_CHECKING was made the default in Numpy 1.10 and bogus
+strides are used in the development branch to smoke out problems. The
+`patch <https://github.com/numpy/numpy/pull/5996>`_ should be updated if
+necessary and applied to the release branch to rationalize the strides.
 
 Update the version of the master branch
 ---------------------------------------
@@ -344,32 +340,24 @@ works.
 
 Update docs.scipy.org
 ---------------------
-Do the following (or ask the doc people to take care of it):
+All documentation for a release can be updated on http://docs.scipy.org/ with:
 
-Rebuild and upload documentation:
+    make dist
+    make upload USERNAME=<yourname> RELEASE=1.11.0
 
-- ``cd numpy/doc``
+Note that ``<username>`` must have SSH credentials on the server.  If you don't
+have those, ask someone who does (the list currently includes @rgommers,
+@juliantaylor and @pv).
+
+Also rebuild and upload ``docs.scipy.org`` front page, if the release
+series is a new one. The front page sources have their own repo:
+https://github.com/scipy/docs.scipy.org.  Do the following:
+
+- Update ``index.rst`` for the new version.
 - ``make dist``
 - Check that the built documentation is OK.
 - ``touch output-is-fine``
-- ``make upload UPLOAD_TARGET=USERNAME@docs.scipy.org:/home/docserver/www-root/doc/numpy-1.5.x/``
-
-where USERNAME should be replaced by your account on
-``docs.scipy.org``, and ``numpy-1.5.x`` by the version number of the
-*release series*. For instance, for Numpy 1.5.1, it should be
-``numpy-1.5.x`` and for Numpy 2.0.0 ``numpy-2.0.x``.
-
-Rebuild and upload ``docs.scipy.org`` front page, if the release
-series is a new one. The front page sources are located in the Scipy
-repository:
-
-- ``cd scipy/doc/frontpage``
-- Edit ``_templates/indexcontent.html`` to add links to the new release series.
-- ``make dist``
-- Check that the built documentation is OK.
-- ``touch output-is-fine``
-- ``make upload USER=USERNAME``
-
+- ``make upload USERNAME=<username> RELEASE=1.x.y``
 
 Update scipy.org
 ----------------

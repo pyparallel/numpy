@@ -60,6 +60,7 @@ NPY_NO_EXPORT int NPY_NUMUSERTYPES = 0;
 #include "vdot.h"
 #include "templ_common.h" /* for npy_mul_with_overflow_intp */
 #include "compiled_base.h"
+#include "mem_overlap.h"
 
 /* Only here for API compatibility */
 NPY_NO_EXPORT PyTypeObject PyBigArray_Type;
@@ -257,6 +258,7 @@ PyArray_As1D(PyObject **op, char **ptr, int *d1, int typecode)
     PyArray_Descr *descr;
     static const char msg[] = "PyArray_As1D: use PyArray_AsCArray.";
 
+    /* 2008-07-14, 1.5 */
     if (DEPRECATE(msg) < 0) {
         return -1;
     }
@@ -278,6 +280,7 @@ PyArray_As2D(PyObject **op, char ***ptr, int *d1, int *d2, int typecode)
     PyArray_Descr *descr;
     static const char msg[] = "PyArray_As1D: use PyArray_AsCArray.";
 
+    /* 2008-07-14, 1.5 */
     if (DEPRECATE(msg) < 0) {
         return -1;
     }
@@ -345,16 +348,6 @@ PyArray_ConcatenateArrays(int narrays, PyArrayObject **arrays, int axis)
     /* Handle standard Python negative indexing */
     if (axis < 0) {
         axis += ndim;
-    }
-
-    if (ndim == 1 && axis != 0) {
-        static const char msg[] = "axis != 0 for ndim == 1; "
-                                  "this will raise an error in "
-                                  "future versions of numpy";
-        if (DEPRECATE(msg) < 0) {
-            return NULL;
-        }
-        axis = 0;
     }
 
     if (axis < 0 || axis >= ndim) {
@@ -479,7 +472,7 @@ PyArray_ConcatenateFlattenedArrays(int narrays, PyArrayObject **arrays,
     PyTypeObject *subtype = &PyArray_Type;
     double priority = NPY_PRIORITY;
     int iarrays;
-    npy_intp stride, sizes[NPY_MAXDIMS];
+    npy_intp stride;
     npy_intp shape = 0;
     PyArray_Descr *dtype = NULL;
     PyArrayObject *ret = NULL;
@@ -496,7 +489,7 @@ PyArray_ConcatenateFlattenedArrays(int narrays, PyArrayObject **arrays,
      * array's shape.
      */
     for (iarrays = 0; iarrays < narrays; ++iarrays) {
-        shape += sizes[iarrays] = PyArray_SIZE(arrays[iarrays]);
+        shape += PyArray_SIZE(arrays[iarrays]);
         /* Check for overflow */
         if (shape < 0) {
             PyErr_SetString(PyExc_ValueError,
@@ -551,7 +544,7 @@ PyArray_ConcatenateFlattenedArrays(int narrays, PyArrayObject **arrays,
 
     for (iarrays = 0; iarrays < narrays; ++iarrays) {
         /* Adjust the window dimensions for this array */
-        sliding_view->dimensions[0] = sizes[iarrays];
+        sliding_view->dimensions[0] = PyArray_SIZE(arrays[iarrays]);
 
         /* Copy the data for this array */
         if (PyArray_CopyAsFlat((PyArrayObject *)sliding_view, arrays[iarrays],
@@ -562,7 +555,8 @@ PyArray_ConcatenateFlattenedArrays(int narrays, PyArrayObject **arrays,
         }
 
         /* Slide to the start of the next window */
-        sliding_view->data += sliding_view->strides[0] * sizes[iarrays];
+        sliding_view->data +=
+            sliding_view->strides[0] * PyArray_SIZE(arrays[iarrays]);
     }
 
     Py_DECREF(sliding_view);
@@ -1265,47 +1259,41 @@ clean_ret:
 static int
 _pyarray_revert(PyArrayObject *ret)
 {
-    npy_intp length;
-    npy_intp i;
-    PyArray_CopySwapFunc *copyswap;
-    char *tmp = NULL, *sw1, *sw2;
-    npy_intp os;
-    char *op;
+    npy_intp length = PyArray_DIM(ret, 0);
+    npy_intp os = PyArray_DESCR(ret)->elsize;
+    char *op = PyArray_DATA(ret);
+    char *sw1 = op;
+    char *sw2;
 
-    length = PyArray_DIMS(ret)[0];
-    copyswap = PyArray_DESCR(ret)->f->copyswap;
-
-    tmp = PyArray_malloc(PyArray_DESCR(ret)->elsize);
-    if (tmp == NULL) {
-        return -1;
-    }
-
-    os = PyArray_DESCR(ret)->elsize;
-    op = PyArray_DATA(ret);
-    sw1 = op;
-    sw2 = op + (length - 1) * os;
-    if (PyArray_ISFLEXIBLE(ret) || PyArray_ISOBJECT(ret)) {
-        for(i = 0; i < length/2; ++i) {
-            memmove(tmp, sw1, os);
-            copyswap(tmp, NULL, 0, NULL);
-            memmove(sw1, sw2, os);
-            copyswap(sw1, NULL, 0, NULL);
-            memmove(sw2, tmp, os);
-            copyswap(sw2, NULL, 0, NULL);
-            sw1 += os;
-            sw2 -= os;
+    if (PyArray_ISNUMBER(ret) && !PyArray_ISCOMPLEX(ret)) {
+        /* Optimization for unstructured dtypes */
+        PyArray_CopySwapNFunc *copyswapn = PyArray_DESCR(ret)->f->copyswapn;
+        sw2 = op + length * os - 1;
+        /* First reverse the whole array byte by byte... */
+        while(sw1 < sw2) {
+            const char tmp = *sw1;
+            *sw1++ = *sw2;
+            *sw2-- = tmp;
         }
-    } else {
-        for(i = 0; i < length/2; ++i) {
+        /* ...then swap in place every item */
+        copyswapn(op, os, NULL, 0, length, 1, NULL);
+    }
+    else {
+        char *tmp = PyArray_malloc(PyArray_DESCR(ret)->elsize);
+        if (tmp == NULL) {
+            return -1;
+        }
+        sw2 = op + (length - 1) * os;
+        while (sw1 < sw2) {
             memcpy(tmp, sw1, os);
             memcpy(sw1, sw2, os);
             memcpy(sw2, tmp, os);
             sw1 += os;
             sw2 -= os;
         }
+        PyArray_free(tmp);
     }
 
-    PyArray_free(tmp);
     return 0;
 }
 
@@ -1455,13 +1443,9 @@ _equivalent_fields(PyObject *field1, PyObject *field2) {
     if (field1 == NULL || field2 == NULL) {
         return 0;
     }
-#if defined(NPY_PY3K)
+
     val = PyObject_RichCompareBool(field1, field2, Py_EQ);
     if (val != 1 || PyErr_Occurred()) {
-#else
-    val = PyObject_Compare(field1, field2);
-    if (val != 0 || PyErr_Occurred()) {
-#endif
         same = 0;
     }
     else {
@@ -1488,13 +1472,8 @@ _equivalent_subarrays(PyArray_ArrayDescr *sub1, PyArray_ArrayDescr *sub2)
         return 0;
     }
 
-#if defined(NPY_PY3K)
     val = PyObject_RichCompareBool(sub1->shape, sub2->shape, Py_EQ);
     if (val != 1 || PyErr_Occurred()) {
-#else
-    val = PyObject_Compare(sub1->shape, sub2->shape);
-    if (val != 0 || PyErr_Occurred()) {
-#endif
         PyErr_Clear();
         return 0;
     }
@@ -2131,8 +2110,6 @@ array_fromfile(PyObject *NPY_UNUSED(ignored), PyObject *args, PyObject *keywds)
     }
     fp = npy_PyFile_Dup2(file, "rb", &orig_pos);
     if (fp == NULL) {
-        PyErr_SetString(PyExc_IOError,
-                "first argument must be an open file");
         Py_DECREF(file);
         return NULL;
     }
@@ -2267,8 +2244,10 @@ array_vdot(PyObject *NPY_UNUSED(dummy), PyObject *args)
 {
     int typenum;
     char *ip1, *ip2, *op;
-    npy_intp n, stride;
+    npy_intp n, stride1, stride2;
     PyObject *op1, *op2;
+    npy_intp newdimptr[1] = {-1};
+    PyArray_Dims newdims = {newdimptr, 1};
     PyArrayObject *ap1 = NULL, *ap2  = NULL, *ret = NULL;
     PyArray_Descr *type;
     PyArray_DotFunc *vdot;
@@ -2292,7 +2271,8 @@ array_vdot(PyObject *NPY_UNUSED(dummy), PyObject *args)
         Py_DECREF(type);
         goto fail;
     }
-    op1 = PyArray_Ravel(ap1, NPY_CORDER);
+
+    op1 = PyArray_Newshape(ap1, &newdims, NPY_CORDER);
     if (op1 == NULL) {
         Py_DECREF(type);
         goto fail;
@@ -2304,7 +2284,7 @@ array_vdot(PyObject *NPY_UNUSED(dummy), PyObject *args)
     if (ap2 == NULL) {
         goto fail;
     }
-    op2 = PyArray_Ravel(ap2, NPY_CORDER);
+    op2 = PyArray_Newshape(ap2, &newdims, NPY_CORDER);
     if (op2 == NULL) {
         goto fail;
     }
@@ -2324,7 +2304,8 @@ array_vdot(PyObject *NPY_UNUSED(dummy), PyObject *args)
     }
 
     n = PyArray_DIM(ap1, 0);
-    stride = type->elsize;
+    stride1 = PyArray_STRIDE(ap1, 0);
+    stride2 = PyArray_STRIDE(ap2, 0);
     ip1 = PyArray_DATA(ap1);
     ip2 = PyArray_DATA(ap2);
     op = PyArray_DATA(ret);
@@ -2352,11 +2333,11 @@ array_vdot(PyObject *NPY_UNUSED(dummy), PyObject *args)
     }
 
     if (n < 500) {
-        vdot(ip1, stride, ip2, stride, op, n, NULL);
+        vdot(ip1, stride1, ip2, stride2, op, n, NULL);
     }
     else {
         NPY_BEGIN_THREADS_DESCR(type);
-        vdot(ip1, stride, ip2, stride, op, n, NULL);
+        vdot(ip1, stride1, ip2, stride2, op, n, NULL);
         NPY_END_THREADS_DESCR(type);
     }
 
@@ -2402,12 +2383,12 @@ array_matmul(PyObject *NPY_UNUSED(m), PyObject *args, PyObject* kwds)
     char *subscripts;
     PyArrayObject *ops[2];
 
-    npy_cache_pyfunc("numpy.core.multiarray", "matmul", &matmul);
+    npy_cache_import("numpy.core.multiarray", "matmul", &matmul);
     if (matmul == NULL) {
         return NULL;
     }
 
-    errval = PyUFunc_CheckOverride(matmul, "__call__",
+    errval = PyUFunc_CheckOverride((PyUFuncObject*)matmul, "__call__",
                                    args, kwds, &override, 2);
     if (errval) {
         return NULL;
@@ -2475,7 +2456,7 @@ array_matmul(PyObject *NPY_UNUSED(m), PyObject *args, PyObject* kwds)
     if (nd1 <= 2 && nd2 <= 2 &&
             (NPY_DOUBLE == typenum || NPY_CDOUBLE == typenum ||
              NPY_FLOAT == typenum || NPY_CFLOAT == typenum)) {
-        return cblas_matrixproduct(typenum, ap1, ap2, out);
+        return cblas_matrixproduct(typenum, ap1, ap2, (PyArrayObject *)out);
     }
 #endif
 
@@ -2518,13 +2499,14 @@ array_matmul(PyObject *NPY_UNUSED(m), PyObject *args, PyObject* kwds)
     }
     ops[0] = ap1;
     ops[1] = ap2;
-    ret = PyArray_EinsteinSum(subscripts, 2, ops, NULL, order, casting, out);
+    ret = PyArray_EinsteinSum(subscripts, 2, ops, NULL, order, casting,
+            (PyArrayObject *)out);
     Py_DECREF(ap1);
     Py_DECREF(ap2);
 
     /* If no output was supplied, possibly convert to a scalar */
     if (ret != NULL && out == NULL) {
-        ret = PyArray_Return((PyArrayObject *)ret);
+        return PyArray_Return((PyArrayObject *)ret);
     }
     return (PyObject *)ret;
 
@@ -4005,29 +3987,87 @@ test_interrupt(PyObject *NPY_UNUSED(self), PyObject *args)
     return PyInt_FromLong(a);
 }
 
+
 static PyObject *
-array_may_share_memory(PyObject *NPY_UNUSED(ignored), PyObject *args)
+array_shares_memory(PyObject *NPY_UNUSED(ignored), PyObject *args, PyObject *kwds)
 {
     PyArrayObject * self = NULL;
     PyArrayObject * other = NULL;
-    int overlap;
+    PyObject *max_work_obj = NULL;
+    static char *kwlist[] = {"self", "other", "max_work", NULL};
 
-    if (!PyArg_ParseTuple(args, "O&O&", PyArray_Converter, &self,
-                          PyArray_Converter, &other)) {
+    mem_overlap_t result;
+    static PyObject *too_hard_cls = NULL;
+    Py_ssize_t max_work = NPY_MAY_SHARE_EXACT;
+    NPY_BEGIN_THREADS_DEF;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&O&|O", kwlist,
+                                     PyArray_Converter, &self,
+                                     PyArray_Converter, &other,
+                                     &max_work_obj)) {
         return NULL;
     }
 
-    overlap = arrays_overlap(self, other);
+    if (max_work_obj == NULL || max_work_obj == Py_None) {
+        /* noop */
+    }
+    else if (PyLong_Check(max_work_obj)) {
+        max_work = PyLong_AsSsize_t(max_work_obj);
+    }
+#if !defined(NPY_PY3K)
+    else if (PyInt_Check(max_work_obj)) {
+        max_work = PyInt_AsSsize_t(max_work_obj);
+    }
+#endif
+    else {
+        PyErr_SetString(PyExc_ValueError, "max_work must be an integer");
+        goto fail;
+    }
+
+    if (max_work < -2) {
+        PyErr_SetString(PyExc_ValueError, "Invalid value for max_work");
+        goto fail;
+    }
+
+    NPY_BEGIN_THREADS;
+    result = solve_may_share_memory(self, other, max_work);
+    NPY_END_THREADS;
+
     Py_XDECREF(self);
     Py_XDECREF(other);
 
-    if (overlap) {
-        Py_RETURN_TRUE;
-    }
-    else {
+    if (result == MEM_OVERLAP_NO) {
         Py_RETURN_FALSE;
     }
+    else if (result == MEM_OVERLAP_YES) {
+        Py_RETURN_TRUE;
+    }
+    else if (result == MEM_OVERLAP_OVERFLOW) {
+        PyErr_SetString(PyExc_OverflowError,
+                        "Integer overflow in computing overlap");
+        return NULL;
+    }
+    else if (result == MEM_OVERLAP_TOO_HARD) {
+        npy_cache_import("numpy.core._internal", "TooHardError",
+                         &too_hard_cls);
+        if (too_hard_cls) {
+            PyErr_SetString(too_hard_cls, "Exceeded max_work");
+        }
+        return NULL;
+    }
+    else {
+        /* Doesn't happen usually */
+        PyErr_SetString(PyExc_RuntimeError,
+                        "Error in computing overlap");
+        return NULL;
+    }
+
+fail:
+    Py_XDECREF(self);
+    Py_XDECREF(other);
+    return NULL;
 }
+
 
 static struct PyMethodDef array_module_methods[] = {
     {"_get_ndarray_c_version",
@@ -4135,9 +4175,9 @@ static struct PyMethodDef array_module_methods[] = {
     {"result_type",
         (PyCFunction)array_result_type,
         METH_VARARGS, NULL},
-    {"may_share_memory",
-        (PyCFunction)array_may_share_memory,
-        METH_VARARGS, NULL},
+    {"shares_memory",
+        (PyCFunction)array_shares_memory,
+        METH_VARARGS | METH_KEYWORDS, NULL},
     /* Datetime-related functions */
     {"datetime_data",
         (PyCFunction)array_datetime_data,
@@ -4484,6 +4524,15 @@ PyMODINIT_FUNC initmultiarray(void) {
         goto err;
     }
 
+#if defined(MS_WIN64) && defined(__GNUC__)
+  PyErr_WarnEx(PyExc_Warning,
+        "Numpy built with MINGW-W64 on Windows 64 bits is experimental, " \
+        "and only available for \n" \
+        "testing. You are advised not to use it for production. \n\n" \
+        "CRASHES ARE TO BE EXPECTED - PLEASE REPORT THEM TO NUMPY DEVELOPERS",
+        1);
+#endif
+
     /* Initialize access to the PyDateTime API */
     numpy_pydatetime_import();
 
@@ -4492,6 +4541,13 @@ PyMODINIT_FUNC initmultiarray(void) {
     if (!d) {
         goto err;
     }
+
+    /*
+     * Before calling PyType_Ready, initialize the tp_hash slot in
+     * PyArray_Type to work around mingw32 not being able initialize
+     * static structure slots with functions from the Python C_API.
+     */
+    PyArray_Type.tp_hash = PyObject_HashNotImplemented;
     if (PyType_Ready(&PyArray_Type) < 0) {
         return RETVAL;
     }
@@ -4588,6 +4644,9 @@ PyMODINIT_FUNC initmultiarray(void) {
     ADDCONST(RAISE);
     ADDCONST(WRAP);
     ADDCONST(MAXDIMS);
+
+    ADDCONST(MAY_SHARE_BOUNDS);
+    ADDCONST(MAY_SHARE_EXACT);
 #undef ADDCONST
 
     Py_INCREF(&PyArray_Type);

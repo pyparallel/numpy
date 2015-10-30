@@ -10,39 +10,27 @@ A collection of utilities for `numpy.ma`.
 """
 from __future__ import division, absolute_import, print_function
 
-__author__ = "Pierre GF Gerard-Marchant ($Author: jarrod.millman $)"
-__version__ = '1.0'
-__revision__ = "$Revision: 3473 $"
-__date__ = '$Date: 2007-10-29 17:18:13 +0200 (Mon, 29 Oct 2007) $'
-
-__all__ = ['apply_along_axis', 'apply_over_axes', 'atleast_1d', 'atleast_2d',
-           'atleast_3d', 'average',
-           'clump_masked', 'clump_unmasked', 'column_stack', 'compress_cols',
-           'compress_nd', 'compress_rowcols', 'compress_rows', 'count_masked',
-           'corrcoef', 'cov',
-           'diagflat', 'dot', 'dstack',
-           'ediff1d',
-           'flatnotmasked_contiguous', 'flatnotmasked_edges',
-           'hsplit', 'hstack',
-           'in1d', 'intersect1d',
-           'mask_cols', 'mask_rowcols', 'mask_rows', 'masked_all',
-           'masked_all_like', 'median', 'mr_',
-           'notmasked_contiguous', 'notmasked_edges',
-           'polyfit',
-           'row_stack',
-           'setdiff1d', 'setxor1d',
-           'unique', 'union1d',
-           'vander', 'vstack',
-           ]
+__all__ = [
+    'apply_along_axis', 'apply_over_axes', 'atleast_1d', 'atleast_2d',
+    'atleast_3d', 'average', 'clump_masked', 'clump_unmasked',
+    'column_stack', 'compress_cols', 'compress_nd', 'compress_rowcols',
+    'compress_rows', 'count_masked', 'corrcoef', 'cov', 'diagflat', 'dot',
+    'dstack', 'ediff1d', 'flatnotmasked_contiguous', 'flatnotmasked_edges',
+    'hsplit', 'hstack', 'in1d', 'intersect1d', 'mask_cols', 'mask_rowcols',
+    'mask_rows', 'masked_all', 'masked_all_like', 'median', 'mr_',
+    'notmasked_contiguous', 'notmasked_edges', 'polyfit', 'row_stack',
+    'setdiff1d', 'setxor1d', 'unique', 'union1d', 'vander', 'vstack',
+    ]
 
 import itertools
 import warnings
 
 from . import core as ma
-from .core import MaskedArray, MAError, add, array, asarray, concatenate, count, \
-    filled, getmask, getmaskarray, make_mask_descr, masked, masked_array, \
-    mask_or, nomask, ones, sort, zeros, getdata
-#from core import *
+from .core import (
+    MaskedArray, MAError, add, array, asarray, concatenate, filled,
+    getmask, getmaskarray, make_mask_descr, masked, masked_array, mask_or,
+    nomask, ones, sort, zeros, getdata
+    )
 
 import numpy as np
 from numpy import ndarray, array as nxarray
@@ -50,9 +38,11 @@ import numpy.core.umath as umath
 from numpy.lib.index_tricks import AxisConcatenator
 
 
-#...............................................................................
 def issequence(seq):
-    """Is seq a sequence (ndarray, list or tuple)?"""
+    """
+    Is seq a sequence (ndarray, list or tuple)?
+
+    """
     if isinstance(seq, (ndarray, tuple, list)):
         return True
     return False
@@ -268,7 +258,6 @@ class _fromnxfunction:
             return '\n'.join((sig, doc, locdoc))
         return
 
-
     def __call__(self, *args, **params):
         func = getattr(np, self.__name__)
         if len(args) == 1:
@@ -280,6 +269,10 @@ class _fromnxfunction:
             elif isinstance(x, tuple) or isinstance(x, list):
                 _d = func(tuple([np.asarray(a) for a in x]), **params)
                 _m = func(tuple([getmaskarray(a) for a in x]), **params)
+                return masked_array(_d, mask=_m)
+            else:
+                _d = func(np.asarray(x), **params)
+                _m = func(getmaskarray(x), **params)
                 return masked_array(_d, mask=_m)
         else:
             arrays = []
@@ -350,9 +343,9 @@ def apply_along_axis(func1d, axis, arr, *args, **kwargs):
             len(res)
         except TypeError:
             asscalar = True
-    # Note: we shouldn't set the dtype of the output from the first result...
-    #...so we force the type to object, and build a list of dtypes
-    #...we'll just take the largest, to avoid some downcasting
+    # Note: we shouldn't set the dtype of the output from the first result
+    # so we force the type to object, and build a list of dtypes.  We'll
+    # just take the largest, to avoid some downcasting
     dtypes = []
     if asscalar:
         dtypes.append(np.asarray(res).dtype)
@@ -420,7 +413,8 @@ def apply_over_axes(func, a, axes):
     if array(axes).ndim == 0:
         axes = (axes,)
     for axis in axes:
-        if axis < 0: axis = N + axis
+        if axis < 0:
+            axis = N + axis
         args = (val, axis)
         res = func(*args)
         if res.ndim == val.ndim:
@@ -557,10 +551,9 @@ def average(a, axis=None, weights=None, returned=False):
                     d = add.reduce(w, axis)
                     del w
                 elif wsh == (ash[axis],):
-                    ni = ash[axis]
                     r = [None] * len(ash)
                     r[axis] = slice(None, None, 1)
-                    w = eval ("w[" + repr(tuple(r)) + "] * ones(ash, float)")
+                    w = eval("w[" + repr(tuple(r)) + "] * ones(ash, float)")
                     n = add.reduce(a * w, axis)
                     d = add.reduce(w, axis, dtype=float)
                     del w, r
@@ -580,11 +573,10 @@ def average(a, axis=None, weights=None, returned=False):
                     n = add.reduce(a * w, axis)
                     d = add.reduce(w, axis, dtype=float)
                 elif wsh == (ash[axis],):
-                    ni = ash[axis]
                     r = [None] * len(ash)
                     r[axis] = slice(None, None, 1)
-                    w = eval ("w[" + repr(tuple(r)) + \
-                              "] * masked_array(ones(ash, float), mask)")
+                    w = eval("w[" + repr(tuple(r)) +
+                             "] * masked_array(ones(ash, float), mask)")
                     n = add.reduce(a * w, axis)
                     d = add.reduce(w, axis, dtype=float)
                 else:
@@ -715,7 +707,6 @@ def median(a, axis=None, out=None, overwrite_input=False):
     return s
 
 
-#..............................................................................
 def compress_nd(x, axis=None):
     """Supress slices from multiple dimensions which contain masked values.
 
@@ -1284,11 +1275,9 @@ def setdiff1d(ar1, ar2, assume_unique=False):
     return ar1[in1d(ar1, ar2, assume_unique=True, invert=True)]
 
 
-#####--------------------------------------------------------------------------
-#---- --- Covariance ---
-#####--------------------------------------------------------------------------
-
-
+###############################################################################
+#                                Covariance                                   #
+###############################################################################
 
 
 def _covhelper(x, y=None, rowvar=True, allow_masked=True):
@@ -1301,7 +1290,7 @@ def _covhelper(x, y=None, rowvar=True, allow_masked=True):
     xmask = ma.getmaskarray(x)
     # Quick exit if we can't process masked data
     if not allow_masked and xmask.any():
-        raise ValueError("Cannot process masked data...")
+        raise ValueError("Cannot process masked data.")
     #
     if x.shape[0] == 1:
         rowvar = True
@@ -1319,7 +1308,7 @@ def _covhelper(x, y=None, rowvar=True, allow_masked=True):
         y = array(y, copy=False, ndmin=2, dtype=float)
         ymask = ma.getmaskarray(y)
         if not allow_masked and ymask.any():
-            raise ValueError("Cannot process masked data...")
+            raise ValueError("Cannot process masked data.")
         if xmask.any() or ymask.any():
             if y.shape == x.shape:
                 # Define some common mask
@@ -1371,11 +1360,11 @@ def cov(x, y=None, rowvar=True, bias=False, allow_masked=True, ddof=None):
         in `x`, the corresponding value is masked in `y`.
         If False, raises a `ValueError` exception when some values are missing.
     ddof : {None, int}, optional
-        .. versionadded:: 1.5
         If not ``None`` normalization is by ``(N - ddof)``, where ``N`` is
         the number of observations; this overrides the value implied by
         ``bias``. The default value is ``None``.
 
+        .. versionadded:: 1.5
 
     Raises
     ------
@@ -1430,16 +1419,18 @@ def corrcoef(x, y=None, rowvar=True, bias=np._NoValue, allow_masked=True,
         is transposed: each column represents a variable, while the rows
         contain observations.
     bias : _NoValue, optional
+        Has no effect, do not use.
+
         .. deprecated:: 1.10.0
-        Has no affect, do not use.
     allow_masked : bool, optional
         If True, masked values are propagated pair-wise: if a value is masked
         in `x`, the corresponding value is masked in `y`.
         If False, raises an exception.  Because `bias` is deprecated, this
         argument needs to be treated as keyword only to avoid a warning.
     ddof : _NoValue, optional
+        Has no effect, do not use.
+
         .. deprecated:: 1.10.0
-        Has no affect, do not use.
 
     See Also
     --------
@@ -1453,8 +1444,9 @@ def corrcoef(x, y=None, rowvar=True, bias=np._NoValue, allow_masked=True,
     arguments had no effect on the return values of the function and can be
     safely ignored in this and previous versions of numpy.
     """
-    msg = 'bias and ddof have no affect and are deprecated'
+    msg = 'bias and ddof have no effect and are deprecated'
     if bias is not np._NoValue or ddof is not np._NoValue:
+        # 2015-03-15, 1.10
         warnings.warn(msg, DeprecationWarning)
     # Get the data
     (x, xnotmask, rowvar) = _covhelper(x, y, rowvar, allow_masked)
@@ -1809,15 +1801,27 @@ def _ezclump(mask):
 
     Returns a series of slices.
     """
-    #def clump_masked(a):
     if mask.ndim > 1:
         mask = mask.ravel()
     idx = (mask[1:] ^ mask[:-1]).nonzero()
     idx = idx[0] + 1
-    slices = [slice(left, right)
-              for (left, right) in zip(itertools.chain([0], idx),
-                                       itertools.chain(idx, [len(mask)]),)]
-    return slices
+
+    if mask[0]:
+        if len(idx) == 0:
+            return [slice(0, mask.size)]
+
+        r = [slice(0, idx[0])]
+        r.extend((slice(left, right)
+                  for left, right in zip(idx[1:-1:2], idx[2::2])))
+    else:
+        if len(idx) == 0:
+            return []
+
+        r = [slice(left, right) for left, right in zip(idx[:-1:2], idx[1::2])]
+
+    if mask[-1]:
+        r.append(slice(idx[-1], mask.size))
+    return r
 
 
 def clump_unmasked(a):
@@ -1856,12 +1860,7 @@ def clump_unmasked(a):
     mask = getattr(a, '_mask', nomask)
     if mask is nomask:
         return [slice(0, a.size)]
-    slices = _ezclump(mask)
-    if a[0] is masked:
-        result = slices[1::2]
-    else:
-        result = slices[::2]
-    return result
+    return _ezclump(~mask)
 
 
 def clump_masked(a):
@@ -1900,35 +1899,32 @@ def clump_masked(a):
     mask = ma.getmask(a)
     if mask is nomask:
         return []
-    slices = _ezclump(mask)
-    if len(slices):
-        if a[0] is masked:
-            slices = slices[::2]
-        else:
-            slices = slices[1::2]
-    return slices
+    return _ezclump(mask)
 
 
+###############################################################################
+#                              Polynomial fit                                 #
+###############################################################################
 
-#####--------------------------------------------------------------------------
-#---- Polynomial fit ---
-#####--------------------------------------------------------------------------
 
 def vander(x, n=None):
     """
     Masked values in the input array result in rows of zeros.
+
     """
     _vander = np.vander(x, n)
     m = getmask(x)
     if m is not nomask:
         _vander[m] = 0
     return _vander
+
 vander.__doc__ = ma.doc_note(np.vander.__doc__, vander.__doc__)
 
 
 def polyfit(x, y, deg, rcond=None, full=False, w=None, cov=False):
     """
     Any masked values in x is propagated in y, and vice-versa.
+
     """
     x = asarray(x)
     y = asarray(y)
@@ -1947,7 +1943,7 @@ def polyfit(x, y, deg, rcond=None, full=False, w=None, cov=False):
         w = asarray(w)
         if w.ndim != 1:
             raise TypeError("expected a 1-d array for weights")
-        if w.shape[0] != y.shape[0] :
+        if w.shape[0] != y.shape[0]:
             raise TypeError("expected w and y to have the same length")
         m = mask_or(m, getmask(w))
 
@@ -1960,5 +1956,3 @@ def polyfit(x, y, deg, rcond=None, full=False, w=None, cov=False):
         return np.polyfit(x, y, deg, rcond, full, w, cov)
 
 polyfit.__doc__ = ma.doc_note(np.polyfit.__doc__, polyfit.__doc__)
-
-################################################################################

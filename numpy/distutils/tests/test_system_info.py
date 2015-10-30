@@ -6,8 +6,10 @@ from tempfile import mkstemp, mkdtemp
 
 from numpy.distutils import ccompiler
 from numpy.testing import TestCase, run_module_suite, assert_, assert_equal
+from numpy.testing.decorators import skipif
 from numpy.distutils.system_info import system_info, ConfigParser
 from numpy.distutils.system_info import default_lib_dirs, default_include_dirs
+
 
 def get_class(name, notfound_action=1):
     """
@@ -23,7 +25,7 @@ def get_class(name, notfound_action=1):
 
 simple_site = """
 [ALL]
-library_dirs = {dir1:s}:{dir2:s}
+library_dirs = {dir1:s}{pathsep:s}{dir2:s}
 libraries = {lib1:s},{lib2:s}
 extra_compile_args = -I/fake/directory
 runtime_library_dirs = {dir1:s}
@@ -54,6 +56,7 @@ void bar(void) {
 
 
 class test_system_info(system_info):
+
     def __init__(self,
                  default_lib_dirs=default_lib_dirs,
                  default_include_dirs=default_include_dirs,
@@ -73,10 +76,10 @@ class test_system_info(system_info):
         self.cp = ConfigParser(defaults)
         # We have to parse the config files afterwards
         # to have a consistent temporary filepath
-        
+
     def _check_libs(self, lib_dirs, libs, opt_libs, exts):
         """Override _check_libs to return with all dirs """
-        info = {'libraries' : libs , 'library_dirs' : lib_dirs}
+        info = {'libraries': libs, 'library_dirs': lib_dirs}
         return info
 
 
@@ -102,11 +105,12 @@ class TestSystemInfoReading(TestCase):
         # Update local site.cfg
         global simple_site, site_cfg
         site_cfg = simple_site.format(**{
-                'dir1' : self._dir1,
-                'lib1' : self._lib1,
-                'dir2' : self._dir2,
-                'lib2' : self._lib2 
-                })
+            'dir1': self._dir1,
+            'lib1': self._lib1,
+            'dir2': self._dir2,
+            'lib2': self._lib2,
+            'pathsep': os.pathsep
+        })
         # Write site.cfg
         fd, self._sitecfg = mkstemp()
         os.close(fd)
@@ -117,7 +121,8 @@ class TestSystemInfoReading(TestCase):
             fd.write(fakelib_c_text)
         with open(self._src2, 'w') as fd:
             fd.write(fakelib_c_text)
-        # We create all class-instances 
+        # We create all class-instances
+
         def site_and_parse(c, site_cfg):
             c.files = [site_cfg]
             c.parse_config_files()
@@ -128,15 +133,15 @@ class TestSystemInfoReading(TestCase):
 
     def tearDown(self):
         # Do each removal separately
-        try: 
+        try:
             shutil.rmtree(self._dir1)
         except:
             pass
-        try: 
+        try:
             shutil.rmtree(self._dir2)
         except:
             pass
-        try: 
+        try:
             os.remove(self._sitecfg)
         except:
             pass
@@ -165,11 +170,10 @@ class TestSystemInfoReading(TestCase):
         # Now from rpath and not runtime_library_dirs
         assert_equal(tsi.get_runtime_lib_dirs(key='rpath'), [self._dir2])
         extra = tsi.calc_extra_info()
-        assert_equal(extra['extra_link_args'], ['-Wl,-rpath='+self._lib2])
+        assert_equal(extra['extra_link_args'], ['-Wl,-rpath=' + self._lib2])
 
     def test_compile1(self):
         # Compile source and link the first source
-        tsi = self.c_temp1
         c = ccompiler.new_compiler()
         try:
             # Change directory to not screw up directories
@@ -177,11 +181,13 @@ class TestSystemInfoReading(TestCase):
             os.chdir(self._dir1)
             c.compile([os.path.basename(self._src1)], output_dir=self._dir1)
             # Ensure that the object exists
-            assert_(os.path.isfile(self._src1.replace('.c', '.o')))
+            assert_(os.path.isfile(self._src1.replace('.c', '.o')) or
+                    os.path.isfile(self._src1.replace('.c', '.obj')))
             os.chdir(previousDir)
         except OSError:
             pass
 
+    @skipif('msvc' in repr(ccompiler.new_compiler()))
     def test_compile2(self):
         # Compile source and link the second source
         tsi = self.c_temp2
@@ -198,6 +204,6 @@ class TestSystemInfoReading(TestCase):
             os.chdir(previousDir)
         except OSError:
             pass
-        
+
 if __name__ == '__main__':
     run_module_suite()

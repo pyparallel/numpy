@@ -89,7 +89,7 @@ try:
         GIT_REVISION = "Unknown"
 
     if not setup_py.ISRELEASED:
-        FULLVERSION += '.dev-' + GIT_REVISION[:7]
+        FULLVERSION += '.dev0+' + GIT_REVISION[:7]
 finally:
     sys.path.pop(0)
 
@@ -99,10 +99,10 @@ finally:
 #-----------------------------------
 
 # Source of the release notes
-RELEASE_NOTES = 'doc/release/1.10.0-notes.rst'
+RELEASE_NOTES = 'doc/release/1.11.0-notes.rst'
 
 # Start/end of the log (from git)
-LOG_START = 'v1.9.0b1'
+LOG_START = 'v1.10.0b1'
 LOG_END = 'master'
 
 
@@ -549,8 +549,16 @@ def tarball_name(type='gztar'):
 
 @task
 def sdist(options):
+    # First clean the repo and update submodules (for up-to-date doc html theme
+    # and Sphinx extensions)
+    sh('git clean -xdf')
+    sh('git submodule init')
+    sh('git submodule update')
+
     # To be sure to bypass paver when building sdist... paver + numpy.distutils
     # do not play well together.
+    # Cython is run over all Cython files in setup.py, so generated C files
+    # will be included.
     sh('python setup.py sdist --formats=gztar,zip')
 
     # Copy the superpack into installers dir

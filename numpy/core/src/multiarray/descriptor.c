@@ -509,8 +509,14 @@ _convert_from_array_descr(PyObject *obj, int align)
                  && (PyUString_Check(title) || PyUnicode_Check(title))
 #endif
                  && (PyDict_GetItem(fields, title) != NULL))) {
-            PyErr_SetString(PyExc_ValueError,
-                    "two fields with the same name");
+#if defined(NPY_PY3K)
+            name = PyUnicode_AsUTF8String(name);
+#endif
+            PyErr_Format(PyExc_ValueError,
+                    "field '%s' occurs more than once", PyString_AsString(name));
+#if defined(NPY_PY3K)
+            Py_DECREF(name);
+#endif
             goto fail;
         }
         dtypeflags |= (conv->flags & NPY_FROM_FIELDS);
@@ -1975,6 +1981,8 @@ arraydescr_names_set(PyArray_Descr *self, PyObject *val)
     }
 
     /*
+     * FIXME
+     *
      * This deprecation has been temporarily removed for the NumPy 1.7
      * release. It should be re-added after the 1.7 branch is done,
      * and a convenience API to replace the typical use-cases for

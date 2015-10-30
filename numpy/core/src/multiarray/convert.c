@@ -171,7 +171,7 @@ PyArray_ToFile(PyArrayObject *self, FILE *fp, char *sep, char *format)
                 /*
                  * standard writing
                  */
-                strobj = PyObject_Str(obj);
+                strobj = PyObject_Repr(obj);
                 Py_DECREF(obj);
                 if (strobj == NULL) {
                     Py_DECREF(it);
@@ -565,6 +565,7 @@ PyArray_View(PyArrayObject *self, PyArray_Descr *type, PyTypeObject *pytype)
                                flags,
                                (PyObject *)self);
     if (ret == NULL) {
+        Py_XDECREF(type);
         return NULL;
     }
 
@@ -572,7 +573,7 @@ PyArray_View(PyArrayObject *self, PyArray_Descr *type, PyTypeObject *pytype)
     Py_INCREF(self);
     if (PyArray_SetBaseObject(ret, (PyObject *)self) < 0) {
         Py_DECREF(ret);
-        Py_DECREF(type);
+        Py_XDECREF(type);
         return NULL;
     }
 
